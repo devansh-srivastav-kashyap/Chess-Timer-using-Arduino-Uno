@@ -1,0 +1,200 @@
+#include<LiquidCrystal.h>
+#define increasewhite 100
+#define decreasewhite 9
+#define white 10
+#define black 11
+#define increaseblack 12
+#define decreaseblack 13
+#define start 8
+
+LiquidCrystal lcd(2,3,4,5,6,7);
+
+void setup()
+{
+  lcd.begin(16,2); 
+  
+  lcd.setCursor(0,0);
+  lcd.print("WorldSKills 2021");
+  delay(4000);
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+  lcd.print("Name:Devansh");
+  delay(4000);
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+  lcd.print("White");
+  
+  lcd.setCursor(10,0);
+  lcd.print("Black");
+  
+  lcd.setCursor(0,1);
+  lcd.print("5:00");
+  
+  lcd.setCursor(11,1);
+  lcd.print("5:00");
+  
+  Serial.begin(9600);
+  pinMode(increasewhite,INPUT);
+  pinMode(decreasewhite,INPUT);
+  pinMode(increaseblack,INPUT);
+  pinMode(decreaseblack,INPUT);
+  pinMode(white,INPUT);
+  pinMode(start,INPUT);
+  pinMode(black,INPUT);
+}
+
+// set time for white
+long defaultTimewhite=300000;
+long set_time_white()
+{
+  
+  if(digitalRead(increasewhite)==HIGH)
+  {
+    defaultTimewhite=defaultTimewhite+1000;
+    lcd.setCursor(0,1);
+    long min= (defaultTimewhite/60000)%60;
+    lcd.print(min);
+    lcd.setCursor(1,1);
+    lcd.print(":");
+    lcd.setCursor(2,1);
+    long sec= (defaultTimewhite/1000)%60;
+    lcd.print(sec);
+  }
+  if(digitalRead(decreasewhite)==HIGH)
+  {
+    defaultTimewhite=defaultTimewhite-1000;
+    lcd.setCursor(0,1);
+    long min= (defaultTimewhite/60000)%60;
+    lcd.print(min);
+    lcd.setCursor(1,1);
+    lcd.print(":");
+    lcd.setCursor(2,1);
+    long sec= (defaultTimewhite/1000)%60;
+    lcd.print(sec);
+  }
+  
+  return defaultTimewhite;
+}
+
+// set time for black
+long defaultTimeblack=300000;
+long set_time_black()
+{
+  
+  if(digitalRead(increaseblack)==HIGH)
+  {
+    defaultTimeblack=defaultTimeblack+1000;
+    lcd.setCursor(11,1);
+    long min= (defaultTimeblack/60000)%60;
+    lcd.print(min);
+    lcd.setCursor(12,1);
+    lcd.print(":");
+    lcd.setCursor(13,1);
+    long sec= (defaultTimeblack/1000)%60;
+    lcd.print(sec);
+  }
+  if(digitalRead(decreaseblack)==HIGH)
+  {
+    defaultTimeblack=defaultTimeblack-1000;
+    lcd.setCursor(11,1);
+    long min= (defaultTimeblack/60000)%60;
+    lcd.print(min);
+    lcd.setCursor(12,1);
+    lcd.print(":");
+    lcd.setCursor(13,1);
+    long sec= (defaultTimeblack/1000)%60;
+    lcd.print(sec);
+  }
+  
+  return defaultTimeblack;
+}
+
+//Reduce time for black
+long reduce_time_black(long t)
+{
+  t=t-1000;
+  delay(1000);
+  lcd.setCursor(11,1);
+  long min= (t/60000)%60;
+  lcd.print(min);
+  lcd.setCursor(12,1);
+  lcd.print(":");
+  lcd.setCursor(13,1);
+  long sec= (t/1000)%60;
+  lcd.print(sec);
+return t;  
+}
+
+//reduce white time
+  long reduce_time_white(long t)
+{
+  t=t-1000;
+  delay(1000);
+  lcd.setCursor(0,1);
+  long min= (t/60000)%60;
+  lcd.print(min);
+  lcd.setCursor(1,1);
+  lcd.print(":");
+  lcd.setCursor(2,1);
+  long sec= (t/1000)%60;
+  lcd.print(sec);
+return t;  
+}
+
+bool blackstate=false;
+bool whitestate=false;
+bool status=false;
+long white_time,black_time;
+
+void loop()
+{
+
+  while(status==false)
+  {
+  white_time=set_time_white();
+  delay(200);
+  black_time=set_time_black();
+  delay(200);
+ if(digitalRead(start)==HIGH)
+{
+ whitestate=true;
+  status=true;
+}
+  }
+while(whitestate==true)
+{
+
+  white_time=reduce_time_white(white_time);
+if(digitalRead(white)==HIGH)
+{
+  blackstate=true;
+  whitestate=false;
+}
+  if(white_time==0)
+  {
+    lcd.clear();
+    lcd.setCursor(3,1);
+    lcd.print("White Loses");
+    exit(0);
+  }
+} 
+  
+while(blackstate==true)
+{
+ black_time= reduce_time_black(black_time);
+  if(digitalRead(black)==HIGH)
+  {
+    whitestate=true;
+    blackstate=false;
+  }
+   if(black_time==0)
+  {
+    lcd.clear();
+    lcd.setCursor(3,1);
+    lcd.print("Black Loses");
+     exit(0);
+  }
+}
+}
