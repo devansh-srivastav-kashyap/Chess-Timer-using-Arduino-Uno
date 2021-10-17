@@ -1,0 +1,497 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.</center></h2>
+  *
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include <stdio.h>
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define D4 GPIOC,GPIO_PIN_4
+#define D5 GPIOB,GPIO_PIN_15
+#define D6 GPIOB,GPIO_PIN_13
+#define D7 GPIOB,GPIO_PIN_14
+
+#define RS GPIOA,GPIO_PIN_10
+#define EN GPIOB,GPIO_PIN_3
+
+#define buttonWhite GPIOA,GPIO_PIN_8
+#define buttonBlack GPIOB,GPIO_PIN_10
+#define start GPIOA,GPIO_PIN_9
+
+//#define R1 GPIOA,GPIO_PIN_10
+//#define R2 GPIOB,GPIO_PIN_3
+//#define R3 GPIOB,GPIO_PIN_5
+//#define R4 GPIOB,GPIO_PIN_4
+//#define C1 GPIOB,GPIO_PIN_10
+//#define C2 GPIOA,GPIO_PIN_8
+//#define C3 GPIOA,GPIO_PIN_9
+//#define C4 GPIOC,GPIO_PIN_7
+
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+
+/* USER CODE BEGIN PV */
+void lcdcommand(uint8_t cmd);
+char keypad();
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+/* USER CODE BEGIN PFP */
+
+//COMMAND PRIVATE FUNCTION
+void lcdcommand(uint8_t cmd)
+{
+	HAL_GPIO_WritePin(RS,GPIO_PIN_RESET); // RS
+// HIGHER NIBBLE
+	HAL_GPIO_WritePin(D4, (cmd>>4)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D5, (cmd>>5)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D6, (cmd>>6)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D7, (cmd>>7)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+
+  HAL_GPIO_WritePin(EN,GPIO_PIN_SET);  //DATA LATCHING
+  HAL_Delay(100);
+	HAL_GPIO_WritePin(EN,GPIO_PIN_RESET);
+
+	//lOWER nIBBLE
+	HAL_GPIO_WritePin(D4, (cmd>>0)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D5, (cmd>>1)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D6, (cmd>>2)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D7, (cmd>>3)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	
+	HAL_GPIO_WritePin(EN,GPIO_PIN_SET);  //DATA LATCHING
+  HAL_Delay(100);
+	HAL_GPIO_WritePin(EN,GPIO_PIN_RESET);
+}	
+
+void lcddata(int data)
+{
+	// HIGHER NIBBLE
+	HAL_GPIO_WritePin(RS,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(D4, (data>>4)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D5, (data>>5)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D6, (data>>6)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D7, (data>>7)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+
+  HAL_GPIO_WritePin(EN,GPIO_PIN_SET);  //DATA LATCHING
+  HAL_Delay(1);
+	HAL_GPIO_WritePin(EN,GPIO_PIN_RESET);
+
+	//lOWER nIBBLE
+	HAL_GPIO_WritePin(D4, (data>>0)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D5, (data>>1)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D6, (data>>2)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(D7, (data>>3)&0x01?GPIO_PIN_SET:GPIO_PIN_RESET);
+	
+	HAL_GPIO_WritePin(EN,GPIO_PIN_SET);  //DATA LATCHING
+  HAL_Delay(1);
+	HAL_GPIO_WritePin(EN,GPIO_PIN_RESET);
+}
+
+void lcdclear()
+{
+	lcdcommand(0x01);
+}
+
+void lcdinit()
+{
+	lcdcommand(0x28);
+	lcdcommand(0x0C);
+	lcdcommand(0x80);
+}
+
+void print(char x[16])
+{
+	for (int i =0; x[i] != '\0'; i++){
+		lcddata(x[i]);
+	}
+}
+	
+void lcdsetCursor(int row,int col)
+{
+	if(row==1){
+	lcdcommand(0x80+col);}
+	if(row==2){
+	lcdcommand(0xC0+col);}
+}
+
+long reduceWhiteTime(unsigned int white_time)
+{
+	white_time=white_time-1000;
+	unsigned int min,sec;char buffer[16];char buffer_sec[16];
+	min=(white_time/60000)%60;
+	sec=(white_time/1000)%60;
+	lcdsetCursor(2,0);
+	sprintf(buffer,"%d",min);
+	print(buffer);
+	lcdsetCursor(2,2);
+	sprintf(buffer,"%d",sec);
+	print(buffer);
+	HAL_Delay(500);
+	return white_time;
+}
+
+
+long reduceBlackTime(unsigned int black_time)
+{
+	black_time=black_time-1000;
+	unsigned int min,sec; char buffer[16];
+	char buffer_sec[16];
+	min=(black_time/60000)%60;
+	sec=(black_time/1000)%60;
+	lcdsetCursor(2,11);
+	sprintf(buffer,"%d",min);
+	print(buffer);
+  lcdsetCursor(2,13);
+	sprintf(buffer_sec,"%d",sec);
+	print(buffer_sec);
+  
+	HAL_Delay(500);
+	return black_time;
+	
+}
+//char keypad()
+//{
+//	HAL_GPIO_WritePin(R1,GPIO_PIN_SET);
+//	HAL_GPIO_WritePin(R2,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R2,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R2,GPIO_PIN_RESET);
+//	HAL_Delay(10);
+ // if(HAL_GPIO_ReadPin(C1)==1){return 'a';}
+	//else if(HAL_GPIO_ReadPin(C2)==1){return '2';}
+	//else if(HAL_GPIO_ReadPin(C3)==1){return '3';}
+	//else if(HAL_GPIO_ReadPin(C4)==1){return 'A';}
+	//else {}
+//	HAL_GPIO_WritePin(R1,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R2,GPIO_PIN_SET);
+//	HAL_GPIO_WritePin(R3,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R4,GPIO_PIN_RESET);
+// HAL_Delay(10);
+//	
+//	if(HAL_GPIO_ReadPin(C1)==1){return '4';}
+//	else if(HAL_GPIO_ReadPin(C2)==1){return '5';}
+//	else if(HAL_GPIO_ReadPin(C3)==1){return '6';}
+//	else if(HAL_GPIO_ReadPin(C4)==1){return 'B';}
+ // else{}
+		
+//	HAL_GPIO_WritePin(R1,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R2,GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(R3,GPIO_PIN_SET);
+//	HAL_GPIO_WritePin(R4,GPIO_PIN_RESET);
+//	HAL_Delay(10);
+	
+//	if(HAL_GPIO_ReadPin(C1)==1){return '7';}
+//	else if(HAL_GPIO_ReadPin(C2)==1){return '8';}
+//	else if(HAL_GPIO_ReadPin(C3)==1){return '9';}
+//	else if(HAL_GPIO_ReadPin(C4)==1){return 'C';}
+//else{}
+	
+//	HAL_GPIO_WritePin(R1,GPIO_PIN_RESET);
+//HAL_GPIO_WritePin(R2,GPIO_PIN_RESET);
+//HAL_GPIO_WritePin(R3,GPIO_PIN_RESET);
+//HAL_GPIO_WritePin(R4,GPIO_PIN_SET);
+//HAL_Delay(10);
+	
+//if(HAL_GPIO_ReadPin(C1)==1){return '*';}
+//	else if(HAL_GPIO_ReadPin(C2)==1){return '0';}
+	//else if(HAL_GPIO_ReadPin(C3)==1){return '#';}
+	//else if(HAL_GPIO_ReadPin(C4)==1){return 'D';}else{}
+//}
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+	lcdclear();
+	lcdinit();
+	lcdsetCursor(1,3);
+	print("IndiaSkills");
+	HAL_Delay(5000);
+	lcdclear();
+	lcdsetCursor(1,1);
+	print("Name: Devansh");
+	lcdsetCursor(2,1);
+	print("WSID: 116394");
+	HAL_Delay(5000);
+	lcdclear();
+	lcdsetCursor(1,3);
+	print("Chess Clock");
+	HAL_Delay(5000);
+	lcdclear();
+	lcdsetCursor(1,0);
+	print("White");
+	lcdsetCursor(1,11);
+	print("Black");
+  
+	lcdsetCursor(2,0);
+	print("5:00");
+	lcdsetCursor(2,11);
+	print("5:00");
+	
+	int white_state=0;
+	int black_state=0;
+	int white_time=300000;   
+	int black_time=300000;	
+	
+	while(1)
+  {
+		if(HAL_GPIO_ReadPin(start)==1)
+		{
+		white_state=1;
+		black_state=0;
+		}
+		while(white_state==1 && black_state==0)
+		{
+			white_time=reduceWhiteTime(white_time);
+			if(HAL_GPIO_ReadPin(buttonBlack)==1)
+			{
+				black_state=1;
+				white_state=0;
+			}
+		}
+		while(black_state==1 && white_state==0)
+			{
+			black_time=reduceBlackTime(black_time);
+			if(HAL_GPIO_ReadPin(buttonWhite)==1)
+			{
+				black_state=0;
+				white_state=1;
+			}
+		}
+		
+			
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLLMUL_6;
+  RCC_OscInitStruct.PLL.PLLDIV = RCC_PLLDIV_3;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_3, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB13 PB14 PB15 PB3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA8 PA9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+}
+
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM21 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM21) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
+
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
